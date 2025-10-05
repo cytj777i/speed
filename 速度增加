@@ -4,19 +4,24 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
 
 -- 初始速度设置
 local defaultSpeed = 16
 local currentSpeed = defaultSpeed
 local maxSpeed = 100
 
+-- 等待玩家角色加载完成
+local character, humanoid
+local function waitForCharacter()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+end
+
 -- 创建主UI框架
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SpeedControlGUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = player.PlayerGui
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 300, 0, 200)
@@ -122,6 +127,7 @@ sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sliderButton.BorderSizePixel = 0
 sliderButton.Text = ""
 sliderButton.Parent = sliderContainer
+sliderButton.ZIndex = 2
 
 local sliderButtonCorner = Instance.new("UICorner")
 sliderButtonCorner.CornerRadius = UDim.new(1, 0)
@@ -158,41 +164,37 @@ resetCorner.Parent = resetButton
 local function updateSpeed(newSpeed)
     newSpeed = math.clamp(newSpeed, 16, maxSpeed)
     currentSpeed = newSpeed
-    
+
     -- 更新滑块位置
     local fillRatio = (newSpeed - 16) / (maxSpeed - 16)
     sliderFill.Size = UDim2.new(fillRatio, 0, 1, 0)
     sliderButton.Position = UDim2.new(fillRatio, -10, 0.5, -10)
-    
+
     -- 更新标签
     speedLabel.Text = "当前速度: " .. newSpeed
     valueLabel.Text = "增加 " .. (newSpeed - 16) .. " 点速度"
-    
-    -- 应用速度到角色[citation:1]
+
+    -- 应用速度到角色
     if humanoid then
         humanoid.WalkSpeed = newSpeed
     end
 end
 
--- 滑块拖动逻辑
+-- 滑块拖动逻辑 - 完全重写
 local dragging = false
-local connection
 
 sliderButton.MouseButton1Down:Connect(function()
     dragging = true
 end)
 
--- 使用单独的连接来监听输入结束，避免重复连接
-connection = UserInputService.InputEnded:Connect(function(input)
+UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = false
-        if connection then
-            connection:Disconnect()
-        end
     end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
+local sliderDragConnection
+sliderDragConnection = UserInputService.InputChanged:Connect(function(input)
     if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local sliderAbsolutePosition = sliderBackground.AbsolutePosition
         local sliderAbsoluteSize = sliderBackground.AbsoluteSize
@@ -218,20 +220,10 @@ sliderBackground.MouseButton1Down:Connect(function(x, y)
     updateSpeed(math.floor(newSpeed))
 end)
 
--- 关闭按钮功能
+-- 关闭按钮功能 - 简化版本
 closeButton.MouseButton1Click:Connect(function()
-    -- 检查screenGui是否仍然存在，再执行销毁操作
-    if screenGui and screenGui.Parent then
-        screenGui:Destroy()
-    end
-end)
-
--- 额外为关闭按钮添加一个鼠标点击效果的反馈，确认点击事件被触发
-closeButton.MouseButton1Down:Connect(function()
-    closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-end)
-closeButton.MouseButton1Up:Connect(function()
-    closeButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    screenGui.Enabled = false
+    screenGui:Destroy()
 end)
 
 -- 重置按钮功能
@@ -239,12 +231,19 @@ resetButton.MouseButton1Click:Connect(function()
     updateSpeed(defaultSpeed)
 end)
 
+-- 初始化角色和速度
+local success, err = pcall(function()
+    waitForCharacter()
+    updateSpeed(defaultSpeed)
+end)
+
+if not success then
+    warn("初始化角色时出错: " .. tostring(err))
+end
+
 -- 角色重新生成时重新应用速度
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoid = newCharacter:WaitForChild("Humanoid")
     humanoid.WalkSpeed = currentSpeed
 end)
-
--- 初始化速度
-updateSpeed(defaultSpeed)
