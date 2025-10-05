@@ -1,0 +1,238 @@
+-- Roblox 本地客户端加速脚本
+-- 作者：基于用户需求编写
+-- 功能：可拖动、关闭、调节速度的UI界面
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+-- 初始速度设置
+local defaultSpeed = 16
+local currentSpeed = defaultSpeed
+local maxSpeed = 100
+
+-- 创建主UI框架
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SpeedControlGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -150, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- 添加圆角效果
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = mainFrame
+
+-- 标题栏
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 8)
+titleCorner.Parent = titleBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -30, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "速度控制器"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Font = Enum.Font.GothamSemibold
+titleLabel.TextSize = 14
+titleLabel.Parent = titleBar
+
+-- 关闭按钮
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -30, 0, 0)
+closeButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+closeButton.BorderSizePixel = 0
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 14
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeButton
+
+-- 内容区域
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 1, -50)
+contentFrame.Position = UDim2.new(0, 10, 0, 40)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
+
+-- 速度显示
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, 0, 0, 30)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "当前速度: " .. defaultSpeed
+speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextSize = 16
+speedLabel.Parent = contentFrame
+
+-- 速度滑块
+local sliderContainer = Instance.new("Frame")
+sliderContainer.Size = UDim2.new(1, 0, 0, 40)
+sliderContainer.Position = UDim2.new(0, 0, 0, 40)
+sliderContainer.BackgroundTransparency = 1
+sliderContainer.Parent = contentFrame
+
+local sliderBackground = Instance.new("Frame")
+sliderBackground.Size = UDim2.new(1, 0, 0, 6)
+sliderBackground.Position = UDim2.new(0, 0, 0.5, -3)
+sliderBackground.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+sliderBackground.BorderSizePixel = 0
+sliderBackground.Parent = sliderContainer
+
+local sliderCorner = Instance.new("UICorner")
+sliderCorner.CornerRadius = UDim.new(1, 0)
+sliderCorner.Parent = sliderBackground
+
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new((defaultSpeed - 16) / (maxSpeed - 16), 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+sliderFill.BorderSizePixel = 0
+sliderFill.Parent = sliderBackground
+
+local sliderFillCorner = Instance.new("UICorner")
+sliderFillCorner.CornerRadius = UDim.new(1, 0)
+sliderFillCorner.Parent = sliderFill
+
+local sliderButton = Instance.new("TextButton")
+sliderButton.Size = UDim2.new(0, 20, 0, 20)
+sliderButton.Position = UDim2.new((defaultSpeed - 16) / (maxSpeed - 16), -10, 0.5, -10)
+sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sliderButton.BorderSizePixel = 0
+sliderButton.Text = ""
+sliderButton.Parent = sliderContainer
+
+local sliderButtonCorner = Instance.new("UICorner")
+sliderButtonCorner.CornerRadius = UDim.new(1, 0)
+sliderButtonCorner.Parent = sliderButton
+
+-- 速度数值标签
+local valueLabel = Instance.new("TextLabel")
+valueLabel.Size = UDim2.new(1, 0, 0, 20)
+valueLabel.Position = UDim2.new(0, 0, 0, 70)
+valueLabel.BackgroundTransparency = 1
+valueLabel.Text = "增加 " .. (defaultSpeed - 16) .. " 点速度"
+valueLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+valueLabel.Font = Enum.Font.Gotham
+valueLabel.TextSize = 12
+valueLabel.Parent = contentFrame
+
+-- 重置按钮
+local resetButton = Instance.new("TextButton")
+resetButton.Size = UDim2.new(0, 80, 0, 30)
+resetButton.Position = UDim2.new(0.5, -40, 1, -40)
+resetButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+resetButton.BorderSizePixel = 0
+resetButton.Text = "重置速度"
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.Font = Enum.Font.Gotham
+resetButton.TextSize = 12
+resetButton.Parent = contentFrame
+
+local resetCorner = Instance.new("UICorner")
+resetCorner.CornerRadius = UDim.new(0, 4)
+resetCorner.Parent = resetButton
+
+-- 滑块拖动功能
+local function updateSpeed(newSpeed)
+    newSpeed = math.clamp(newSpeed, 16, maxSpeed)
+    currentSpeed = newSpeed
+    
+    -- 更新滑块位置
+    local fillRatio = (newSpeed - 16) / (maxSpeed - 16)
+    sliderFill.Size = UDim2.new(fillRatio, 0, 1, 0)
+    sliderButton.Position = UDim2.new(fillRatio, -10, 0.5, -10)
+    
+    -- 更新标签
+    speedLabel.Text = "当前速度: " .. newSpeed
+    valueLabel.Text = "增加 " .. (newSpeed - 16) .. " 点速度"
+    
+    -- 应用速度到角色[citation:1]
+    if humanoid then
+        humanoid.WalkSpeed = newSpeed
+    end
+end
+
+-- 滑块拖动逻辑
+local dragging = false
+
+sliderButton.MouseButton1Down:Connect(function()
+    dragging = true
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local sliderAbsolutePosition = sliderBackground.AbsolutePosition
+        local sliderAbsoluteSize = sliderBackground.AbsoluteSize
+        
+        local mouseX = input.Position.X
+        local relativeX = math.clamp(mouseX - sliderAbsolutePosition.X, 0, sliderAbsoluteSize.X)
+        local ratio = relativeX / sliderAbsoluteSize.X
+        
+        local newSpeed = 16 + ratio * (maxSpeed - 16)
+        updateSpeed(math.floor(newSpeed))
+    end
+end)
+
+-- 点击滑块背景快速设置速度
+sliderBackground.MouseButton1Down:Connect(function(x, y)
+    local sliderAbsolutePosition = sliderBackground.AbsolutePosition
+    local sliderAbsoluteSize = sliderBackground.AbsoluteSize
+    
+    local relativeX = math.clamp(x - sliderAbsolutePosition.X, 0, sliderAbsoluteSize.X)
+    local ratio = relativeX / sliderAbsoluteSize.X
+    
+    local newSpeed = 16 + ratio * (maxSpeed - 16)
+    updateSpeed(math.floor(newSpeed))
+end)
+
+-- 关闭按钮功能
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- 重置按钮功能
+resetButton.MouseButton1Click:Connect(function()
+    updateSpeed(defaultSpeed)
+end)
+
+-- 角色重新生成时重新应用速度
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoid = newCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = currentSpeed
+end)
+
+-- 初始化速度
+updateSpeed(defaultSpeed)
